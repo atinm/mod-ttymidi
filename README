@@ -12,7 +12,8 @@ run the following command:
 This program depends on JACK, so you should have the development headers
 for that installed. In Debian or Ubuntu, you can install it by running:
 
-	apt-get install libjack-jackd2-dev
+	apt-get install libjack-jackd2-dev (Debian/Ubuntu)
+	brew install jack (Mac OS)
 
 After you compile ttyMIDI, you may wish to copy it to /usr/bin for easy
 access. This can be done simply by following command:

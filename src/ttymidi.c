@@ -29,10 +29,14 @@
 #include <jack/intclient.h>
 #include <jack/midiport.h>
 #include <jack/ringbuffer.h>
-#include <linux/serial.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#if __linux__
+#include <linux/serial.h>
 #include <asm/termios.h>
+#elif __APPLE__
+#include <termios.h>
+#endif
 #include <assert.h>
 // MOD specific
 #include "mod-semaphore.h"
@@ -155,7 +159,7 @@ void arg_set_defaults(arguments_t *arguments)
 	strncpy(arguments->name, "ttymidi", MAX_DEV_STR_LEN);
 }
 
-const char *argp_program_version     = "ttymidi 1.0.0";
+const char *argp_program_version     = "ttymidi 1.0.1";
 const char *argp_program_bug_address = "falktx@moddevices.com";
 static char doc[]       = "ttymidi - Connect serial port devices to JACK MIDI programs!";
 static struct argp argp = { options, parse_opt, NULL, doc, NULL, NULL, NULL };
@@ -688,7 +692,11 @@ rerun:
 /* --------------------------------------------------------------------- */
 // Main program
 
+#if __linux__
 static struct termios2 oldtio, newtio;
+#elif __APPLE__
+static struct termios oldtio, newtio;
+#endif
 static jackdata_t jackdata;
 static pthread_t midi_out_thread;
 
@@ -726,7 +734,11 @@ static bool _ttymidi_init(bool exit_on_failure, jack_client_t* client)
         }
 
         /* save current serial port settings */
+#if __linux__        
         ioctl(serial, TCGETS2, &oldtio);
+#elif __APPLE__
+        tcgetattr(serial, &oldtio);
+#endif
 
         /* clear struct for new port settings */
         bzero(&newtio, sizeof(newtio));
@@ -738,8 +750,11 @@ static bool _ttymidi_init(bool exit_on_failure, jack_client_t* client)
          * CLOCAL  : local connection, no modem contol
          * CREAD   : enable receiving characters
          */
+#if __linux__
         newtio.c_cflag = BOTHER | CS8 | CLOCAL | CREAD; // CRTSCTS removed
-
+#elif __APPLE__
+        newtio.c_cflag = CS8 | CLOCAL | CREAD; // CRTSCTS removed
+#endif
         /*
          * IGNPAR : ignore bytes with parity errors
          * ICRNL  : map CR to NL (otherwise a CR input on the other computer will not terminate input)
@@ -769,6 +784,7 @@ static bool _ttymidi_init(bool exit_on_failure, jack_client_t* client)
         /*
          * now activate the settings for the port
          */
+#if __linux__
         ioctl(serial, TCSETS2, &newtio);
 
         // Linux-specific: enable low latency mode (FTDI "nagling off")
@@ -777,6 +793,9 @@ static bool _ttymidi_init(bool exit_on_failure, jack_client_t* client)
         ioctl(serial, TIOCGSERIAL, &ser_info);
         ser_info.flags |= ASYNC_LOW_LATENCY;
         ioctl(serial, TIOCSSERIAL, &ser_info);
+#elif __APPLE__
+        tcsetattr(serial, TCSANOW, &newtio);
+#endif
 
 #ifdef DEBUG
         if (arguments.printonly)
@@ -824,7 +843,11 @@ void _ttymidi_finish(void)
         pthread_join(midi_out_thread, NULL);
 
         /* restore the old port settings */
+#if __linux__
         ioctl(serial, TCSETS2, &oldtio);
+#elif __APPLE__
+        tcsetattr(serial, TCSANOW, &oldtio);
+#endif
         printf("\ndone!\n");
 }
 

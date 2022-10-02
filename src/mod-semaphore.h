@@ -1,12 +1,26 @@
 
+#if __linux__
 #define MOD_SEMAPHORE_USE_FUTEX
 
-#ifdef MOD_SEMAPHORE_USE_FUTEX
 #include <linux/futex.h>
 #include <sys/time.h>
 #include <errno.h>
 #include <syscall.h>
 #include <unistd.h>
+#elif __APPLE__
+/* Mac OS X defines sem_init but actually does not implement them */
+#include <dispatch/dispatch.h>
+
+typedef dispatch_semaphore_t	sem_t;
+
+#define sem_init(psem,x,val)	*psem = dispatch_semaphore_create(val)
+#define sem_post(psem)		dispatch_semaphore_signal(*psem)
+#define sem_wait(psem)		dispatch_semaphore_wait(*psem, \
+					DISPATCH_TIME_FOREVER)
+#define sem_timedwait(psem, timeout)		dispatch_semaphore_wait(*psem, \
+					*timeout)
+
+#define sem_destroy(psem)	dispatch_release(*psem)
 #else
 #include <semaphore.h>
 #endif
@@ -72,6 +86,14 @@ int sem_timedwait_secs(sem_t* sem, int secs)
             return 1;
     }
 }
+#elif __APPLE__
+static inline
+int sem_timedwait_secs(sem_t* sem, int secs)
+{
+      dispatch_time_t seconds = dispatch_walltime(NULL, secs * NSEC_PER_SEC);
+      return sem_timedwait(sem, &seconds);
+}
+
 #else
 /* --------------------------------------------------------------------- */
 // POSIX Semaphore

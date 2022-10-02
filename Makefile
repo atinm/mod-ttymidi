@@ -3,8 +3,17 @@ DESTDIR ?=
 PREFIX = /usr/local
 
 CC ?= gcc
+UNAME_S := $(shell uname -s)
+
+ifeq ($(UNAME_S),Linux)
 CFLAGS += -std=gnu99 -Wall -Wextra -Wshadow -Werror -fvisibility=hidden
 LDFLAGS += -Wl,--no-undefined
+endif
+
+ifeq ($(UNAME_S),Darwin)
+CFLAGS += -I$(shell brew --prefix)/include -std=gnu99 -Wall -Wextra -Wshadow -Werror -fvisibility=hidden
+LDFLAGS += -L$(shell brew --prefix)/lib -largp # -Wl,--no-undefined
+endif
 
 ifeq ($(DEBUG),1)
 CFLAGS += -O0 -g -DDEBUG
